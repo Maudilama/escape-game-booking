@@ -1,0 +1,12 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+escape-game:
+  booking:
+    opening-hour: 10
+    closing-hour: 22
+    max-days-in-advance: 60
+    cancellation-min-hours: 24
