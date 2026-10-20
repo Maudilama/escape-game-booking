@@ -13,9 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 @Service
 @Transactional
@@ -25,15 +23,18 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
+    private final SlotPlanner slotPlanner;
     private final BookingProperties properties;
     private final Clock clock;
 
     public BookingService(BookingRepository bookingRepository,
                           RoomRepository roomRepository,
+                          SlotPlanner slotPlanner,
                           BookingProperties properties,
                           Clock clock) {
         this.bookingRepository = bookingRepository;
         this.roomRepository = roomRepository;
+        this.slotPlanner = slotPlanner;
         this.properties = properties;
         this.clock = clock;
     }
@@ -48,7 +49,7 @@ public class BookingService {
 
         checkPlayerCount(room, playerCount);
         checkBookingWindow(startAt, now);
-        checkSlotAlignment(room, startAt);
+        checkSlot(room, startAt);
 
         LocalDateTime endAt = startAt.plusMinutes(room.getSessionMinutes());
         boolean slotTaken = bookingRepository
@@ -96,35 +97,19 @@ public class BookingService {
     }
 
     private void checkBookingWindow(LocalDateTime startAt, LocalDateTime now) {
+        if (slotPlanner.isInBookingWindow(startAt, now)) {
+            return;
+        }
         if (!startAt.isAfter(now)) {
             throw new BusinessRuleException("Impossible de réserver un créneau passé.");
         }
-        if (startAt.isAfter(now.plusDays(properties.maxDaysInAdvance()))) {
-            throw new BusinessRuleException(
-                    "Les réservations sont ouvertes " + properties.maxDaysInAdvance()
-                            + " jours à l'avance maximum.");
-        }
+        throw new BusinessRuleException(
+                "Les réservations sont ouvertes " + properties.maxDaysInAdvance()
+                        + " jours à l'avance maximum.");
     }
 
-    private void checkSlotAlignment(Room room, LocalDateTime startAt) {
-        LocalTime opening = LocalTime.of(properties.openingHour(), 0);
-        LocalTime closing = LocalTime.of(properties.closingHour(), 0);
-        LocalTime start = startAt.toLocalTime();
-        LocalTime end = start.plusMinutes(room.getSessionMinutes());
-
-        boolean outsideOpeningHours = start.isBefore(opening)
-                || end.isAfter(closing)
-                || end.isBefore(start); // la session déborderait après minuit
-        if (outsideOpeningHours) {
-            throw new BusinessRuleException("Ce créneau est en dehors des horaires d'ouverture.");
-        }
-
-        long minutesSinceOpening = Duration.between(opening, start).toMinutes();
-        int slotLength = room.getSessionMinutes() + room.getResetMinutes();
-        boolean onGrid = minutesSinceOpening % slotLength == 0
-                && start.getSecond() == 0
-                && start.getNano() == 0;
-        if (!onGrid) {
+    private void checkSlot(Room room, LocalDateTime startAt) {
+        if (!slotPlanner.isValidSlot(room, startAt)) {
             throw new BusinessRuleException(
                     "L'heure de début ne correspond à aucun créneau de cette salle.");
         }

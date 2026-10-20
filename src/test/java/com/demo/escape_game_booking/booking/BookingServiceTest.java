@@ -57,7 +57,9 @@ class BookingServiceTest {
     void setUp() {
         Clock fixedClock = Clock.fixed(NOW.atZone(PARIS).toInstant(), PARIS);
         BookingProperties properties = new BookingProperties(10, 22, 60, 24);
-        bookingService = new BookingService(bookingRepository, roomRepository, properties, fixedClock);
+        SlotPlanner slotPlanner = new SlotPlanner(properties);
+        bookingService = new BookingService(bookingRepository, roomRepository,
+                slotPlanner, properties, fixedClock);
 
         room = new Room("L'Asile de Saint-Ombre", "Hôpital psychiatrique", "Description",
                 (short) 3, (short) 2, (short) 5, 60, 30, new BigDecimal("30.00"));
@@ -148,7 +150,7 @@ class BookingServiceTest {
         void rejectsSlotAfterClosing() {
             givenRoomExists();
 
-            assertRejected(request(LocalDateTime.of(2026, 11, 7, 22, 0), 4), "horaires d'ouverture");
+            assertRejected(request(LocalDateTime.of(2026, 11, 7, 22, 0), 4), "aucun créneau");
         }
 
         @Test

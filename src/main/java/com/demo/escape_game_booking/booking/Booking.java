@@ -76,6 +76,10 @@ public class Booking {
         this.status = BookingStatus.CANCELLED;
     }
 
+    public boolean overlaps(LocalDateTime start, LocalDateTime end) {
+        return startAt.isBefore(end) && endAt.isAfter(start);
+    }
+
     public Long getId() { return id; }
     public Room getRoom() { return room; }
     public String getCustomerName() { return customerName; }
