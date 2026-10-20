@@ -1,0 +1,4 @@
+package com.demo.escape_game_booking.auth.dto;
+
+public record TokenResponse(String accessToken, String tokenType, long expiresIn) {
+}

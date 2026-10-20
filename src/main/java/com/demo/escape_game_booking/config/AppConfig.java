@@ -8,7 +8,11 @@ import java.time.Clock;
 import java.time.ZoneId;
 
 @Configuration
-@EnableConfigurationProperties(BookingProperties.class)
+@EnableConfigurationProperties({
+        BookingProperties.class,
+        JwtProperties.class,
+        AdminProperties.class
+})
 public class AppConfig {
 
     @Bean

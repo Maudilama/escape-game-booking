@@ -1,12 +1,12 @@
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-
 escape-game:
   booking:
     opening-hour: 10
     closing-hour: 22
     max-days-in-advance: 60
     cancellation-min-hours: 24
+  jwt:
+    secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes-long}
+    token-validity: 2h
+  admin:
+    email: ${ADMIN_EMAIL:admin@escapegame.local}
+    password: ${ADMIN_PASSWORD:admin-local-1234}

@@ -48,7 +48,6 @@ public class Booking {
     private long version;
 
     protected Booking() {
-        // requis par JPA
     }
 
     public Booking(Room room, String customerName, String customerEmail,

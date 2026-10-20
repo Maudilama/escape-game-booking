@@ -42,7 +42,6 @@ public class Room {
     private boolean active;
 
     protected Room() {
-        // requis par JPA
     }
 
     public Room(String name, String theme, String description, short difficulty,
