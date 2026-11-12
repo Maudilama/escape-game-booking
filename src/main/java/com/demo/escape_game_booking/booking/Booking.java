@@ -2,10 +2,12 @@ package com.demo.escape_game_booking.booking;
 
 import com.demo.escape_game_booking.common.BusinessRuleException;
 import com.demo.escape_game_booking.room.Room;
+import com.demo.escape_game_booking.user.User;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "bookings")
@@ -19,11 +21,9 @@ public class Booking {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
-    @Column(nullable = false, length = 100)
-    private String customerName;
-
-    @Column(nullable = false)
-    private String customerEmail;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(nullable = false)
     private LocalDateTime startAt;
@@ -48,13 +48,12 @@ public class Booking {
     private long version;
 
     protected Booking() {
+        // requis par JPA
     }
 
-    public Booking(Room room, String customerName, String customerEmail,
-                   LocalDateTime startAt, short playerCount, LocalDateTime now) {
+    public Booking(Room room, User user, LocalDateTime startAt, short playerCount, LocalDateTime now) {
         this.room = room;
-        this.customerName = customerName;
-        this.customerEmail = customerEmail;
+        this.user = user;
         this.startAt = startAt;
         this.endAt = startAt.plusMinutes(room.getSessionMinutes());
         this.playerCount = playerCount;
@@ -63,10 +62,9 @@ public class Booking {
         this.createdAt = now;
     }
 
+    /** Annulation par le client : soumise au délai minimum. */
     public void cancel(LocalDateTime now, int minHoursBeforeStart) {
-        if (status == BookingStatus.CANCELLED) {
-            throw new BusinessRuleException("Cette réservation est déjà annulée.");
-        }
+        ensureNotCancelled();
         if (now.plusHours(minHoursBeforeStart).isAfter(startAt)) {
             throw new BusinessRuleException(
                     "Une réservation ne peut plus être annulée moins de "
@@ -75,14 +73,29 @@ public class Booking {
         this.status = BookingStatus.CANCELLED;
     }
 
+    /** Annulation par un administrateur : possible à tout moment. */
+    public void forceCancel() {
+        ensureNotCancelled();
+        this.status = BookingStatus.CANCELLED;
+    }
+
+    public boolean isOwnedBy(Long userId) {
+        return Objects.equals(user.getId(), userId);
+    }
+
     public boolean overlaps(LocalDateTime start, LocalDateTime end) {
         return startAt.isBefore(end) && endAt.isAfter(start);
     }
 
+    private void ensureNotCancelled() {
+        if (status == BookingStatus.CANCELLED) {
+            throw new BusinessRuleException("Cette réservation est déjà annulée.");
+        }
+    }
+
     public Long getId() { return id; }
     public Room getRoom() { return room; }
-    public String getCustomerName() { return customerName; }
-    public String getCustomerEmail() { return customerEmail; }
+    public User getUser() { return user; }
     public LocalDateTime getStartAt() { return startAt; }
     public LocalDateTime getEndAt() { return endAt; }
     public short getPlayerCount() { return playerCount; }

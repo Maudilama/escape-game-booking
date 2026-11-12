@@ -2,8 +2,11 @@ package com.demo.escape_game_booking.booking;
 
 import com.demo.escape_game_booking.common.BusinessRuleException;
 import com.demo.escape_game_booking.room.Room;
+import com.demo.escape_game_booking.user.Role;
+import com.demo.escape_game_booking.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,8 +23,16 @@ class BookingTest {
     private final Room room = new Room("L'Asile de Saint-Ombre", "Hôpital psychiatrique",
             "Description", (short) 3, (short) 2, (short) 5, 60, 30, new BigDecimal("30.00"));
 
+    private final User customer = userWithId(1L);
+
+    private static User userWithId(Long id) {
+        User user = new User("user" + id + "@example.com", "hash", "Prénom", "Nom", Role.CUSTOMER, NOW);
+        ReflectionTestUtils.setField(user, "id", id);
+        return user;
+    }
+
     private Booking newBooking() {
-        return new Booking(room, "Maud", "maud@example.com", SESSION_START, (short) 4, NOW);
+        return new Booking(room, customer, SESSION_START, (short) 4, NOW);
     }
 
     @Test
@@ -33,6 +44,15 @@ class BookingTest {
         assertThat(booking.getTotalPrice()).isEqualByComparingTo("120.00");
         assertThat(booking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
         assertThat(booking.getCreatedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    @DisplayName("sait à qui elle appartient")
+    void knowsItsOwner() {
+        Booking booking = newBooking();
+
+        assertThat(booking.isOwnedBy(1L)).isTrue();
+        assertThat(booking.isOwnedBy(2L)).isFalse();
     }
 
     @Test
@@ -56,7 +76,7 @@ class BookingTest {
     }
 
     @Test
-    @DisplayName("refuse l'annulation moins de 24 h avant la session")
+    @DisplayName("refuse l'annulation client moins de 24 h avant la session")
     void refusesCancellationLessThan24HoursBefore() {
         Booking booking = newBooking();
 
@@ -68,12 +88,22 @@ class BookingTest {
     }
 
     @Test
+    @DisplayName("accepte l'annulation forcée (admin) même juste avant la session")
+    void forceCancelIgnoresDelay() {
+        Booking booking = newBooking();
+
+        booking.forceCancel();
+
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
     @DisplayName("refuse d'annuler une réservation déjà annulée")
     void refusesDoubleCancellation() {
         Booking booking = newBooking();
-        booking.cancel(SESSION_START.minusDays(2), 24);
+        booking.forceCancel();
 
-        assertThatThrownBy(() -> booking.cancel(SESSION_START.minusDays(2), 24))
+        assertThatThrownBy(booking::forceCancel)
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("déjà annulée");
     }

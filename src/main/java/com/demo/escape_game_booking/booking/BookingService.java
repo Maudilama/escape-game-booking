@@ -1,5 +1,7 @@
 package com.demo.escape_game_booking.booking;
 
+import com.demo.escape_game_booking.auth.CurrentUser;
+import com.demo.escape_game_booking.auth.InvalidCredentialsException;
 import com.demo.escape_game_booking.booking.dto.BookingResponse;
 import com.demo.escape_game_booking.booking.dto.CreateBookingRequest;
 import com.demo.escape_game_booking.common.BusinessRuleException;
@@ -8,12 +10,16 @@ import com.demo.escape_game_booking.config.BookingProperties;
 import com.demo.escape_game_booking.room.Room;
 import com.demo.escape_game_booking.room.RoomNotFoundException;
 import com.demo.escape_game_booking.room.RoomRepository;
+import com.demo.escape_game_booking.user.User;
+import com.demo.escape_game_booking.user.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @Transactional
@@ -23,23 +29,26 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
+    private final UserRepository userRepository;
     private final SlotPlanner slotPlanner;
     private final BookingProperties properties;
     private final Clock clock;
 
     public BookingService(BookingRepository bookingRepository,
                           RoomRepository roomRepository,
+                          UserRepository userRepository,
                           SlotPlanner slotPlanner,
                           BookingProperties properties,
                           Clock clock) {
         this.bookingRepository = bookingRepository;
         this.roomRepository = roomRepository;
+        this.userRepository = userRepository;
         this.slotPlanner = slotPlanner;
         this.properties = properties;
         this.clock = clock;
     }
 
-    public BookingResponse create(CreateBookingRequest request) {
+    public BookingResponse create(CreateBookingRequest request, CurrentUser currentUser) {
         Room room = roomRepository.findByIdAndActiveTrue(request.roomId())
                 .orElseThrow(() -> new RoomNotFoundException(request.roomId()));
 
@@ -59,8 +68,11 @@ public class BookingService {
             throw new ConflictException(SLOT_TAKEN);
         }
 
-        Booking booking = new Booking(room, request.customerName(), request.customerEmail(),
-                startAt, (short) playerCount, now);
+        // Jeton valide mais compte supprimé entre-temps : on refuse
+        User user = userRepository.findById(currentUser.id())
+                .orElseThrow(InvalidCredentialsException::new);
+
+        Booking booking = new Booking(room, user, startAt, (short) playerCount, now);
 
         try {
             bookingRepository.saveAndFlush(booking);
@@ -73,18 +85,43 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public BookingResponse findById(Long id) {
-        return BookingResponse.from(getBooking(id));
+    public BookingResponse findById(Long id, CurrentUser currentUser) {
+        return BookingResponse.from(getBookingVisibleTo(id, currentUser));
     }
 
-    public BookingResponse cancel(Long id) {
-        Booking booking = getBooking(id);
-        booking.cancel(LocalDateTime.now(clock), properties.cancellationMinHours());
+    @Transactional(readOnly = true)
+    public List<BookingResponse> findMine(CurrentUser currentUser) {
+        return bookingRepository.findByUserIdOrderByStartAtDesc(currentUser.id()).stream()
+                .map(BookingResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingResponse> findAllOn(LocalDate date) {
+        return bookingRepository.findByStartAtGreaterThanEqualAndStartAtLessThanOrderByStartAtAsc(
+                        date.atStartOfDay(), date.plusDays(1).atStartOfDay()).stream()
+                .map(BookingResponse::from)
+                .toList();
+    }
+
+    public BookingResponse cancel(Long id, CurrentUser currentUser) {
+        Booking booking = getBookingVisibleTo(id, currentUser);
+        if (currentUser.admin()) {
+            booking.forceCancel();
+        } else {
+            booking.cancel(LocalDateTime.now(clock), properties.cancellationMinHours());
+        }
         return BookingResponse.from(booking);
     }
 
-    private Booking getBooking(Long id) {
+    /**
+     * Un client ne voit que ses réservations ; un admin les voit toutes.
+     * Une réservation d'un autre client est traitée comme inexistante (404),
+     * pour ne pas révéler son existence.
+     */
+    private Booking getBookingVisibleTo(Long id, CurrentUser currentUser) {
         return bookingRepository.findById(id)
+                .filter(booking -> currentUser.admin() || booking.isOwnedBy(currentUser.id()))
                 .orElseThrow(() -> new BookingNotFoundException(id));
     }
 

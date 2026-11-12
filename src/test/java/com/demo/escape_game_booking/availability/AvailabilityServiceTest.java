@@ -9,6 +9,8 @@ import com.demo.escape_game_booking.config.BookingProperties;
 import com.demo.escape_game_booking.room.Room;
 import com.demo.escape_game_booking.room.RoomNotFoundException;
 import com.demo.escape_game_booking.room.RoomRepository;
+import com.demo.escape_game_booking.user.Role;
+import com.demo.escape_game_booking.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,8 +71,8 @@ class AvailabilityServiceTest {
     @DisplayName("marque comme indisponible un créneau déjà réservé")
     void marksBookedSlotUnavailable() {
         when(roomRepository.findByIdAndActiveTrue(ROOM_ID)).thenReturn(Optional.of(room));
-        Booking booking = new Booking(room, "Maud", "maud@example.com",
-                DAY.atTime(11, 30), (short) 4, NOW);
+        User customer = new User("maud@example.com", "hash", "Maud", "Torchy", Role.CUSTOMER, NOW);
+        Booking booking = new Booking(room, customer, DAY.atTime(11, 30), (short) 4, NOW);
         when(bookingRepository.findByRoomIdAndStatusAndStartAtLessThanAndEndAtGreaterThan(
                 any(), any(), any(), any())).thenReturn(List.of(booking));
 
