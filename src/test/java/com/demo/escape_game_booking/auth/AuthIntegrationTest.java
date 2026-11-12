@@ -84,4 +84,12 @@ class AuthIntegrationTest extends IntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("la documentation OpenAPI est accessible sans être connecté")
+    void apiDocumentationIsPublic() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("Escape Game Booking API"));
+    }
 }

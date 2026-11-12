@@ -3,6 +3,7 @@ package com.demo.escape_game_booking.booking;
 import com.demo.escape_game_booking.auth.CurrentUser;
 import com.demo.escape_game_booking.booking.dto.BookingResponse;
 import com.demo.escape_game_booking.booking.dto.CreateBookingRequest;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,6 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/bookings")
+@SecurityRequirement(name = "bearerAuth")
 public class BookingController {
 
     private final BookingService bookingService;
