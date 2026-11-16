@@ -11,7 +11,8 @@ import java.time.ZoneId;
 @EnableConfigurationProperties({
         BookingProperties.class,
         JwtProperties.class,
-        AdminProperties.class
+        AdminProperties.class,
+        CorsProperties.class
 })
 public class AppConfig {
 
