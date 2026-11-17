@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.sql.Timestamp;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -38,7 +39,7 @@ class BookingIntegrationTest extends IntegrationTest {
         @DisplayName("une réservation est créée et le créneau devient indisponible")
         void createsBookingAndUpdatesAvailability() throws Exception {
             String alice = registerAndLogin("alice@example.com");
-            LocalDateTime slot = nextWeekAt(11, 30);
+            LocalDateTime slot = nextSaturdayAt(11, 30);
 
             createBooking(alice, slot)
                     .andExpect(status().isCreated())
@@ -60,7 +61,7 @@ class BookingIntegrationTest extends IntegrationTest {
         void otherCustomerGetsNotFound() throws Exception {
             String alice = registerAndLogin("alice@example.com");
             String bob = registerAndLogin("bob@example.com");
-            long bookingId = idOf(createBooking(alice, nextWeekAt(11, 30)));
+            long bookingId = idOf(createBooking(alice, nextSaturdayAt(11, 30)));
 
             mockMvc.perform(get("/api/bookings/{id}", bookingId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(bob)))
@@ -75,7 +76,7 @@ class BookingIntegrationTest extends IntegrationTest {
         @DisplayName("l'admin voit le planning du jour avec les réservations de tous les clients")
         void adminSeesDailyPlanning() throws Exception {
             String alice = registerAndLogin("alice@example.com");
-            LocalDateTime slot = nextWeekAt(11, 30);
+            LocalDateTime slot = nextSaturdayAt(11, 30);
             createBooking(alice, slot).andExpect(status().isCreated());
 
             mockMvc.perform(get("/api/admin/bookings")
@@ -91,7 +92,7 @@ class BookingIntegrationTest extends IntegrationTest {
         void cancelledSlotCanBeBookedAgain() throws Exception {
             String alice = registerAndLogin("alice@example.com");
             String bob = registerAndLogin("bob@example.com");
-            LocalDateTime slot = nextWeekAt(11, 30);
+            LocalDateTime slot = nextSaturdayAt(11, 30);
             long bookingId = idOf(createBooking(alice, slot));
 
             mockMvc.perform(patch("/api/bookings/{id}/cancel", bookingId)
@@ -100,6 +101,16 @@ class BookingIntegrationTest extends IntegrationTest {
                     .andExpect(jsonPath("$.status").value("CANCELLED"));
 
             createBooking(bob, slot).andExpect(status().isCreated());
+        }
+
+        @Test
+        @DisplayName("refuse une réservation un lundi (422)")
+        void rejectsBookingOnClosedDay() throws Exception {
+            String alice = registerAndLogin("alice@example.com");
+
+            createBooking(alice, upcomingAt(DayOfWeek.MONDAY, 11, 30))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.detail").value("L'escape game est fermé ce jour-là."));
         }
     }
 
@@ -112,7 +123,7 @@ class BookingIntegrationTest extends IntegrationTest {
         void onlyOneOfTwoSimultaneousBookingsSucceeds() throws Exception {
             String alice = registerAndLogin("alice@example.com");
             String bob = registerAndLogin("bob@example.com");
-            String body = bookingJson(ASILE_ID, nextWeekAt(11, 30), 4);
+            String body = bookingJson(ASILE_ID, nextSaturdayAt(11, 30), 4);
             CountDownLatch startSignal = new CountDownLatch(1);
 
             try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
@@ -136,7 +147,7 @@ class BookingIntegrationTest extends IntegrationTest {
         @DisplayName("PostgreSQL refuse deux réservations confirmées qui se chevauchent")
         void databaseRejectsOverlappingConfirmedBookings() {
             Long adminId = adminId();
-            LocalDateTime start = nextWeekAt(11, 30);
+            LocalDateTime start = nextSaturdayAt(11, 30);
             insertBooking(adminId, start, "CONFIRMED");
 
             assertThatThrownBy(() -> insertBooking(adminId, start.plusMinutes(30), "CONFIRMED"))
@@ -148,7 +159,7 @@ class BookingIntegrationTest extends IntegrationTest {
         @DisplayName("PostgreSQL ignore les réservations annulées dans la contrainte")
         void databaseIgnoresCancelledBookings() {
             Long adminId = adminId();
-            LocalDateTime start = nextWeekAt(11, 30);
+            LocalDateTime start = nextSaturdayAt(11, 30);
             insertBooking(adminId, start, "CANCELLED");
 
             assertThatCode(() -> insertBooking(adminId, start, "CONFIRMED"))

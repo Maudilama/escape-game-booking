@@ -7,6 +7,7 @@ public record AvailabilityResponse(
         Long roomId,
         String roomName,
         LocalDate date,
+        boolean closed,
         List<SlotResponse> slots
 ) {
 }

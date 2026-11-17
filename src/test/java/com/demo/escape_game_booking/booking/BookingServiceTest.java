@@ -26,9 +26,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.*;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,7 +69,7 @@ class BookingServiceTest {
     @BeforeEach
     void setUp() {
         Clock fixedClock = Clock.fixed(NOW.atZone(PARIS).toInstant(), PARIS);
-        BookingProperties properties = new BookingProperties(10, 22, 60, 24);
+        BookingProperties properties = new BookingProperties(10, 22, 60, 24, List.of(DayOfWeek.MONDAY));
         SlotPlanner slotPlanner = new SlotPlanner(properties);
         bookingService = new BookingService(bookingRepository, roomRepository, userRepository,
                 slotPlanner, properties, fixedClock);
@@ -291,6 +289,14 @@ class BookingServiceTest {
 
             assertThatThrownBy(() -> bookingService.cancel(99L, CUSTOMER))
                     .isInstanceOf(BookingNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("refuse une réservation un jour de fermeture")
+        void rejectsClosedDay() {
+            givenRoomExists();
+
+            assertRejected(request(LocalDateTime.of(2026, 11, 9, 11, 30), 4), "fermé");
         }
     }
 }

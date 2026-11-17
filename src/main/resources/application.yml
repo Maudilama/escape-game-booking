@@ -10,6 +10,8 @@ escape-game:
     closing-hour: 22
     max-days-in-advance: 60
     cancellation-min-hours: 24
+    closed-days:
+      - MONDAY
   jwt:
     secret: ${JWT_SECRET:local-dev-secret-change-me-at-least-32-bytes-long}
     token-validity: 2h

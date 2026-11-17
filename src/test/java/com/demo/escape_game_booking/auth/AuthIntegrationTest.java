@@ -70,7 +70,7 @@ class AuthIntegrationTest extends IntegrationTest {
     void bookingRequiresAuthentication() throws Exception {
         mockMvc.perform(post("/api/bookings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson(ASILE_ID, nextWeekAt(11, 30), 4)))
+                        .content(bookingJson(ASILE_ID, nextSaturdayAt(11, 30), 4)))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -80,7 +80,7 @@ class AuthIntegrationTest extends IntegrationTest {
         String token = registerAndLogin("alice@example.com");
 
         mockMvc.perform(get("/api/admin/bookings")
-                        .param("date", nextWeekAt(10, 0).toLocalDate().toString())
+                        .param("date", nextSaturdayAt(10, 0).toLocalDate().toString())
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isForbidden());
     }

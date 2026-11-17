@@ -146,6 +146,9 @@ public class BookingService {
     }
 
     private void checkSlot(Room room, LocalDateTime startAt) {
+        if (slotPlanner.isClosed(startAt.toLocalDate())) {
+            throw new BusinessRuleException("L'escape game est fermé ce jour-là.");
+        }
         if (!slotPlanner.isValidSlot(room, startAt)) {
             throw new BusinessRuleException(
                     "L'heure de début ne correspond à aucun créneau de cette salle.");

@@ -19,10 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.*;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,7 +49,7 @@ class AvailabilityServiceTest {
     @BeforeEach
     void setUp() {
         Clock fixedClock = Clock.fixed(NOW.atZone(PARIS).toInstant(), PARIS);
-        SlotPlanner slotPlanner = new SlotPlanner(new BookingProperties(10, 22, 60, 24));
+        SlotPlanner slotPlanner = new SlotPlanner(new BookingProperties(10, 22, 60, 24, List.of(DayOfWeek.MONDAY)));
         availabilityService = new AvailabilityService(roomRepository, bookingRepository,
                 slotPlanner, fixedClock);
 
@@ -102,5 +99,16 @@ class AvailabilityServiceTest {
 
         assertThatThrownBy(() -> availabilityService.getAvailability(ROOM_ID, DAY))
                 .isInstanceOf(RoomNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("signale un jour de fermeture, sans aucun créneau")
+    void flagsClosedDay() {
+        when(roomRepository.findByIdAndActiveTrue(ROOM_ID)).thenReturn(Optional.of(room));
+
+        AvailabilityResponse response = availabilityService.getAvailability(ROOM_ID, LocalDate.of(2026, 11, 9));
+
+        assertThat(response.closed()).isTrue();
+        assertThat(response.slots()).isEmpty();
     }
 }

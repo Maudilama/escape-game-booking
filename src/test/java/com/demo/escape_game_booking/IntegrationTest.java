@@ -13,9 +13,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,9 +50,13 @@ public abstract class IntegrationTest {
         jdbcTemplate.execute("DELETE FROM users WHERE role <> 'ADMIN'");
     }
 
-    /** Un créneau valide dans 7 jours, quelle que soit la date d'exécution des tests. */
-    protected static LocalDateTime nextWeekAt(int hour, int minute) {
-        return LocalDate.now(PARIS).plusDays(7).atTime(hour, minute);
+    /** Le prochain samedi (dans 1 à 7 jours) : un jour ouvert, quel que soit le jour où les tests tournent. */
+    protected static LocalDateTime nextSaturdayAt(int hour, int minute) {
+        return upcomingAt(DayOfWeek.SATURDAY, hour, minute);
+    }
+
+    protected static LocalDateTime upcomingAt(DayOfWeek day, int hour, int minute) {
+        return LocalDate.now(PARIS).with(TemporalAdjusters.next(day)).atTime(hour, minute);
     }
 
     protected static String bookingJson(long roomId, LocalDateTime startAt, int players) {

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,7 +19,7 @@ class SlotPlannerTest {
     private static final LocalDate DAY = LocalDate.of(2026, 11, 7);
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 1, 10, 0);
 
-    private final SlotPlanner slotPlanner = new SlotPlanner(new BookingProperties(10, 22, 60, 24));
+    private final SlotPlanner slotPlanner = new SlotPlanner(new BookingProperties(10, 22, 60, 24, List.of(DayOfWeek.MONDAY)));
 
     private static Room roomWith(int sessionMinutes, int resetMinutes) {
         return new Room("Salle test", "Thème", "Description", (short) 3, (short) 2, (short) 6,
@@ -63,5 +64,15 @@ class SlotPlannerTest {
         assertThat(slotPlanner.isInBookingWindow(NOW, NOW)).isFalse();
         assertThat(slotPlanner.isInBookingWindow(NOW.plusDays(60), NOW)).isTrue();
         assertThat(slotPlanner.isInBookingWindow(NOW.plusDays(60).plusMinutes(1), NOW)).isFalse();
+    }
+
+    @Test
+    @DisplayName("ne propose aucun créneau un jour de fermeture")
+    void hasNoSlotOnClosedDay() {
+        LocalDate monday = LocalDate.of(2026, 11, 9);
+
+        assertThat(slotPlanner.isClosed(monday)).isTrue();
+        assertThat(slotPlanner.slotStartsFor(roomWith(60, 30), monday)).isEmpty();
+        assertThat(slotPlanner.isClosed(DAY)).isFalse();
     }
 }

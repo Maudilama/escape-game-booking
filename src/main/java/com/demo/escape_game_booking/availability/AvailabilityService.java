@@ -50,7 +50,7 @@ public class AvailabilityService {
                 .map(start -> toSlot(room, start, now, bookingsOfTheDay))
                 .toList();
 
-        return new AvailabilityResponse(roomId, room.getName(), date, slots);
+        return new AvailabilityResponse(roomId, room.getName(), date, slotPlanner.isClosed(date), slots);
     }
 
     private SlotResponse toSlot(Room room, LocalDateTime start, LocalDateTime now,

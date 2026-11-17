@@ -23,6 +23,9 @@ public class SlotPlanner {
     }
 
     public List<LocalDateTime> slotStartsFor(Room room, LocalDate date) {
+        if (isClosed(date)) {
+            return List.of();
+        }
         LocalDateTime opening = date.atTime(properties.openingHour(), 0);
         LocalDateTime closing = date.atTime(properties.closingHour(), 0);
         int step = room.getSessionMinutes() + room.getResetMinutes();
@@ -34,6 +37,10 @@ public class SlotPlanner {
             starts.add(start);
         }
         return starts;
+    }
+
+    public boolean isClosed(LocalDate date) {
+        return properties.closedDays().contains(date.getDayOfWeek());
     }
 
     public boolean isValidSlot(Room room, LocalDateTime startAt) {
