@@ -5,6 +5,7 @@ import com.demo.escape_game_booking.auth.dto.RegisterRequest;
 import com.demo.escape_game_booking.auth.dto.TokenResponse;
 import com.demo.escape_game_booking.auth.dto.UserResponse;
 import com.demo.escape_game_booking.common.ConflictException;
+import com.demo.escape_game_booking.common.ErrorCode;
 import com.demo.escape_game_booking.user.Role;
 import com.demo.escape_game_booking.user.User;
 import com.demo.escape_game_booking.user.UserRepository;
@@ -39,7 +40,7 @@ public class AuthService {
     public UserResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
         if (userRepository.existsByEmail(email)) {
-            throw new ConflictException(EMAIL_TAKEN);
+            throw new ConflictException(ErrorCode.EMAIL_TAKEN, EMAIL_TAKEN);
         }
 
         User user = new User(email, passwordEncoder.encode(request.password()),
@@ -50,7 +51,7 @@ public class AuthService {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
             // Deux inscriptions simultanées avec le même email
-            throw new ConflictException(EMAIL_TAKEN);
+            throw new ConflictException(ErrorCode.EMAIL_TAKEN, EMAIL_TAKEN);
         }
 
         return UserResponse.from(user);

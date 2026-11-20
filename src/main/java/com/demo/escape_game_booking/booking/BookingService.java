@@ -1,4 +1,6 @@
 package com.demo.escape_game_booking.booking;
+import com.demo.escape_game_booking.common.ErrorCode;
+import java.util.Map;
 
 import com.demo.escape_game_booking.auth.CurrentUser;
 import com.demo.escape_game_booking.auth.InvalidCredentialsException;
@@ -65,7 +67,7 @@ public class BookingService {
                 .existsByRoomIdAndStatusAndStartAtLessThanAndEndAtGreaterThan(
                         room.getId(), BookingStatus.CONFIRMED, endAt, startAt);
         if (slotTaken) {
-            throw new ConflictException(SLOT_TAKEN);
+            throw new ConflictException(ErrorCode.SLOT_TAKEN, SLOT_TAKEN);
         }
 
         // Jeton valide mais compte supprimé entre-temps : on refuse
@@ -78,7 +80,7 @@ public class BookingService {
             bookingRepository.saveAndFlush(booking);
         } catch (DataIntegrityViolationException e) {
             // Deux réservations simultanées : la contrainte PostgreSQL a bloqué la seconde
-            throw new ConflictException(SLOT_TAKEN);
+            throw new ConflictException(ErrorCode.SLOT_TAKEN, SLOT_TAKEN);
         }
 
         return BookingResponse.from(booking);
@@ -127,9 +129,10 @@ public class BookingService {
 
     private void checkPlayerCount(Room room, int playerCount) {
         if (!room.acceptsPlayerCount(playerCount)) {
-            throw new BusinessRuleException(
+            throw new BusinessRuleException(ErrorCode.PLAYER_COUNT_OUT_OF_RANGE,
                     "La salle « " + room.getName() + " » accepte de "
-                            + room.getMinPlayers() + " à " + room.getMaxPlayers() + " joueurs.");
+                            + room.getMinPlayers() + " à " + room.getMaxPlayers() + " joueurs.",
+                    Map.of("min", room.getMinPlayers(), "max", room.getMaxPlayers()));
         }
     }
 
@@ -138,19 +141,22 @@ public class BookingService {
             return;
         }
         if (!startAt.isAfter(now)) {
-            throw new BusinessRuleException("Impossible de réserver un créneau passé.");
+            throw new BusinessRuleException(ErrorCode.SLOT_IN_PAST,
+                    "Impossible de réserver un créneau passé.");
         }
-        throw new BusinessRuleException(
+        throw new BusinessRuleException(ErrorCode.BEYOND_BOOKING_WINDOW,
                 "Les réservations sont ouvertes " + properties.maxDaysInAdvance()
-                        + " jours à l'avance maximum.");
+                        + " jours à l'avance maximum.",
+                Map.of("days", properties.maxDaysInAdvance()));
     }
 
     private void checkSlot(Room room, LocalDateTime startAt) {
         if (slotPlanner.isClosed(startAt.toLocalDate())) {
-            throw new BusinessRuleException("L'escape game est fermé ce jour-là.");
+            throw new BusinessRuleException(ErrorCode.ROOM_CLOSED,
+                    "L'escape game est fermé ce jour-là.");
         }
         if (!slotPlanner.isValidSlot(room, startAt)) {
-            throw new BusinessRuleException(
+            throw new BusinessRuleException(ErrorCode.NOT_A_SLOT,
                     "L'heure de début ne correspond à aucun créneau de cette salle.");
         }
     }

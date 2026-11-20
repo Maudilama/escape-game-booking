@@ -1,8 +1,14 @@
 package com.demo.escape_game_booking.common;
 
-public class BusinessRuleException extends RuntimeException {
+import java.util.Map;
 
-    public BusinessRuleException(String message) {
-        super(message);
+public class BusinessRuleException extends ApiException {
+
+    public BusinessRuleException(ErrorCode code, String message) {
+        super(code, message);
+    }
+
+    public BusinessRuleException(ErrorCode code, String message, Map<String, Object> params) {
+        super(code, message, params);
     }
 }

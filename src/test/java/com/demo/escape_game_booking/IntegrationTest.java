@@ -56,7 +56,10 @@ public abstract class IntegrationTest {
     }
 
     protected static LocalDateTime upcomingAt(DayOfWeek day, int hour, int minute) {
-        return LocalDate.now(PARIS).with(TemporalAdjusters.next(day)).atTime(hour, minute);
+        return LocalDate.now(PARIS)
+                .plusDays(7)
+                .with(TemporalAdjusters.nextOrSame(day))
+                .atTime(hour, minute);
     }
 
     protected static String bookingJson(long roomId, LocalDateTime startAt, int players) {

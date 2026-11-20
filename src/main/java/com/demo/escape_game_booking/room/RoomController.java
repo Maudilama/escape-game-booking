@@ -1,7 +1,14 @@
 package com.demo.escape_game_booking.room;
 
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -14,12 +21,18 @@ public class RoomController {
     }
 
     @GetMapping
-    public List<RoomResponse> getRooms() {
-        return roomService.findAllActive();
+    public ResponseEntity<List<RoomResponse>> getRooms(Locale locale) {
+        return localized(locale).body(roomService.findAllActive(locale));
     }
 
     @GetMapping("/{id}")
-    public RoomResponse getRoom(@PathVariable Long id) {
-        return roomService.findById(id);
+    public ResponseEntity<RoomResponse> getRoom(@PathVariable Long id, Locale locale) {
+        return localized(locale).body(roomService.findById(id, locale));
+    }
+
+    private static ResponseEntity.BodyBuilder localized(Locale locale) {
+        return ResponseEntity.ok()
+                .varyBy(HttpHeaders.ACCEPT_LANGUAGE)
+                .header(HttpHeaders.CONTENT_LANGUAGE, locale.getLanguage());
     }
 }

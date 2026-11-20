@@ -1,6 +1,7 @@
 package com.demo.escape_game_booking.booking;
 
 import com.demo.escape_game_booking.common.BusinessRuleException;
+import com.demo.escape_game_booking.common.ErrorCode;
 import com.demo.escape_game_booking.room.Room;
 import com.demo.escape_game_booking.user.User;
 import jakarta.persistence.*;
@@ -8,6 +9,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.Map;
 
 @Entity
 @Table(name = "bookings")
@@ -66,9 +68,10 @@ public class Booking {
     public void cancel(LocalDateTime now, int minHoursBeforeStart) {
         ensureNotCancelled();
         if (now.plusHours(minHoursBeforeStart).isAfter(startAt)) {
-            throw new BusinessRuleException(
+            throw new BusinessRuleException(ErrorCode.CANCELLATION_TOO_LATE,
                     "Une réservation ne peut plus être annulée moins de "
-                            + minHoursBeforeStart + " h avant la session.");
+                            + minHoursBeforeStart + " h avant la session.",
+                    Map.of("hours", minHoursBeforeStart));
         }
         this.status = BookingStatus.CANCELLED;
     }
@@ -89,7 +92,8 @@ public class Booking {
 
     private void ensureNotCancelled() {
         if (status == BookingStatus.CANCELLED) {
-            throw new BusinessRuleException("Cette réservation est déjà annulée.");
+            throw new BusinessRuleException(ErrorCode.ALREADY_CANCELLED,
+                    "Cette réservation est déjà annulée.");
         }
     }
 

@@ -2,6 +2,9 @@ package com.demo.escape_game_booking.room;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 @Entity
 @Table(name = "rooms")
@@ -40,6 +43,18 @@ public class Room {
 
     @Column(nullable = false)
     private boolean active;
+
+    /** Les traductions, indexées par code de langue (« en », « es »). */
+    @ElementCollection
+    @CollectionTable(name = "room_translations", joinColumns = @JoinColumn(name = "room_id"))
+    @MapKeyColumn(name = "locale", length = 5)
+    private Map<String, RoomText> translations = new HashMap<>();
+
+    /** Le thème et la description dans la langue demandée, ou en français s'il n'y a pas de traduction. */
+    public RoomText textIn(Locale locale) {
+        RoomText translated = translations.get(locale.getLanguage());
+        return translated != null ? translated : new RoomText(theme, description);
+    }
 
     protected Room() {
     }

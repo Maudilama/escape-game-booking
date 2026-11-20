@@ -5,6 +5,7 @@ import com.demo.escape_game_booking.booking.dto.BookingResponse;
 import com.demo.escape_game_booking.booking.dto.CreateBookingRequest;
 import com.demo.escape_game_booking.common.BusinessRuleException;
 import com.demo.escape_game_booking.common.ConflictException;
+import com.demo.escape_game_booking.common.ErrorCode;
 import com.demo.escape_game_booking.config.BookingProperties;
 import com.demo.escape_game_booking.room.Room;
 import com.demo.escape_game_booking.room.RoomNotFoundException;
@@ -99,10 +100,10 @@ class BookingServiceTest {
         return booking;
     }
 
-    private void assertRejected(CreateBookingRequest request, String expectedMessagePart) {
+    private void assertRejected(CreateBookingRequest request, ErrorCode expectedCode) {
         assertThatThrownBy(() -> bookingService.create(request, CUSTOMER))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining(expectedMessagePart);
+                .isInstanceOfSatisfying(BusinessRuleException.class,
+                        ex -> assertThat(ex.getCode()).isEqualTo(expectedCode));
 
         verify(bookingRepository, never()).saveAndFlush(any());
     }
@@ -145,7 +146,7 @@ class BookingServiceTest {
         void rejectsInvalidPlayerCount(int players) {
             givenRoomExists();
 
-            assertRejected(request(VALID_SLOT, players), "joueurs");
+            assertRejected(request(VALID_SLOT, players), ErrorCode.PLAYER_COUNT_OUT_OF_RANGE);
         }
 
         @Test
@@ -153,7 +154,7 @@ class BookingServiceTest {
         void rejectsPastSlot() {
             givenRoomExists();
 
-            assertRejected(request(LocalDateTime.of(2026, 10, 31, 10, 0), 4), "passé");
+            assertRejected(request(LocalDateTime.of(2026, 10, 31, 10, 0), 4), ErrorCode.SLOT_IN_PAST);
         }
 
         @Test
@@ -161,7 +162,7 @@ class BookingServiceTest {
         void rejectsSlotTooFarInAdvance() {
             givenRoomExists();
 
-            assertRejected(request(LocalDateTime.of(2027, 1, 1, 10, 0), 4), "60 jours");
+            assertRejected(request(LocalDateTime.of(2027, 1, 1, 10, 0), 4), ErrorCode.BEYOND_BOOKING_WINDOW);
         }
 
         @Test
@@ -169,7 +170,7 @@ class BookingServiceTest {
         void rejectsSlotOffGrid() {
             givenRoomExists();
 
-            assertRejected(request(LocalDateTime.of(2026, 11, 7, 11, 0), 4), "aucun créneau");
+            assertRejected(request(LocalDateTime.of(2026, 11, 7, 11, 0), 4), ErrorCode.NOT_A_SLOT);
         }
 
         @Test
@@ -177,7 +178,7 @@ class BookingServiceTest {
         void rejectsSlotAfterClosing() {
             givenRoomExists();
 
-            assertRejected(request(LocalDateTime.of(2026, 11, 7, 22, 0), 4), "aucun créneau");
+            assertRejected(request(LocalDateTime.of(2026, 11, 7, 22, 0), 4), ErrorCode.NOT_A_SLOT);
         }
 
         @Test
@@ -202,8 +203,8 @@ class BookingServiceTest {
                     .thenThrow(new DataIntegrityViolationException("bookings_no_overlap"));
 
             assertThatThrownBy(() -> bookingService.create(request(VALID_SLOT, 4), CUSTOMER))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessageContaining("déjà réservé");
+                    .isInstanceOfSatisfying(ConflictException.class,
+                            ex -> assertThat(ex.getCode()).isEqualTo(ErrorCode.SLOT_TAKEN));
         }
     }
 
@@ -296,7 +297,7 @@ class BookingServiceTest {
         void rejectsClosedDay() {
             givenRoomExists();
 
-            assertRejected(request(LocalDateTime.of(2026, 11, 9, 11, 30), 4), "fermé");
+            assertRejected(request(LocalDateTime.of(2026, 11, 9, 11, 30), 4), ErrorCode.ROOM_CLOSED);
         }
     }
 }

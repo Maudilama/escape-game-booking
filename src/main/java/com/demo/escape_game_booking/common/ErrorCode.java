@@ -1,0 +1,17 @@
+package com.demo.escape_game_booking.common;
+
+public enum ErrorCode {
+    VALIDATION_FAILED,
+    INVALID_CREDENTIALS,
+    EMAIL_TAKEN,
+    ROOM_NOT_FOUND,
+    BOOKING_NOT_FOUND,
+    SLOT_TAKEN,
+    PLAYER_COUNT_OUT_OF_RANGE,
+    SLOT_IN_PAST,
+    BEYOND_BOOKING_WINDOW,
+    ROOM_CLOSED,
+    NOT_A_SLOT,
+    ALREADY_CANCELLED,
+    CANCELLATION_TOO_LATE
+}
