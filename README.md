@@ -1,6 +1,6 @@
 # 🕯️ Escape Game Booking API
 
-![CI](https://github.com/<ton-pseudo>/<nom-du-repo>/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/Maudilama/escape-game-booking/actions/workflows/ci.yml/badge.svg)](https://github.com/Maudilama/escape-game-booking/actions/workflows/ci.yml)
 ![Java](https://img.shields.io/badge/Java-25-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)
@@ -8,6 +8,8 @@
 API REST de réservation pour un escape game au thème horrifique : 4 salles, des créneaux calculés automatiquement, des comptes clients et un espace administrateur.
 
 Projet personnel réalisé pour approfondir **Java** et **Spring Boot**, avec une attention particulière portée aux règles métier, à la sécurité et aux tests.
+
+👉 L'interface web de ce projet est développée en Angular : [escape-game-front](https://github.com/Maudilama/escape-game-front).
 
 ---
 
@@ -41,7 +43,7 @@ Chaque salle a un temps de remise en état de 30 minutes entre deux sessions : l
 ## ✨ Fonctionnalités
 
 **Visiteurs**
-- Consulter les salles
+- Consulter les salles, en français, en anglais ou en espagnol
 - Consulter les créneaux disponibles d'une salle pour une date donnée
 - Créer un compte et se connecter (JWT)
 
@@ -56,6 +58,7 @@ Chaque salle a un temps de remise en état de 30 minutes entre deux sessions : l
 **Règles métier appliquées**
 - Le nombre de joueurs doit respecter les limites de la salle
 - Un créneau doit tomber sur la grille de la salle et dans les horaires d'ouverture
+- L'escape game est fermé le lundi (jours de fermeture configurables)
 - Réservation possible jusqu'à 60 jours à l'avance, jamais dans le passé
 - Impossible de réserver deux fois le même créneau, même en cas de requêtes simultanées
 
@@ -95,37 +98,50 @@ Un test d'intégration lance deux réservations simultanées du même créneau e
 Les entités protègent leur propre cohérence : une `Booking` calcule elle-même sa date de fin et son prix, et expose deux façons explicites de s'annuler (`cancel` pour le client, soumise au délai de 24 h, et `forceCancel` pour l'administrateur).
 
 ### Règles de planning centralisées
-La grille des créneaux et la fenêtre de réservation sont définies dans un seul composant, `SlotPlanner`, utilisé à la fois pour valider une réservation et pour calculer les disponibilités. Le calendrier affiché ne peut donc jamais proposer un créneau que l'API refuserait.
+La grille des créneaux, les jours de fermeture et la fenêtre de réservation sont définis dans un seul composant, `SlotPlanner`, utilisé à la fois pour valider une réservation et pour calculer les disponibilités. Le calendrier affiché ne peut donc jamais proposer un créneau que l'API refuserait.
 
 ### Horloge injectée
 Le temps est fourni par un `Clock` injecté plutôt que par `LocalDateTime.now()`. Les tests unitaires figent ainsi « maintenant » à une date précise et vérifient les règles temporelles de façon déterministe.
 
-### Erreurs standardisées
-Toutes les erreurs suivent le format [RFC 9457 (Problem Details)](https://www.rfc-editor.org/rfc/rfc9457) :
+### Erreurs standardisées, avec un code stable
+Toutes les erreurs suivent le format [RFC 9457 (Problem Details)](https://www.rfc-editor.org/rfc/rfc9457), complété par un **code stable** et ses **paramètres** :
 
 ```json
 {
   "title": "Règle métier non respectée",
   "status": 422,
   "detail": "La salle « L'Asile de Saint-Ombre » accepte de 2 à 5 joueurs.",
-  "instance": "/api/bookings"
+  "instance": "/api/bookings",
+  "code": "PLAYER_COUNT_OUT_OF_RANGE",
+  "params": { "min": 2, "max": 5 }
 }
 ```
 
-| Code | Signification |
-|---|---|
-| `400` | Champs invalides (avec le détail par champ) |
-| `401` | Non authentifié ou identifiants incorrects |
-| `403` | Accès réservé aux administrateurs |
-| `404` | Ressource introuvable, ou réservation appartenant à un autre client |
-| `409` | Créneau déjà réservé, email déjà utilisé |
-| `422` | Règle métier non respectée |
+Le `code` est un contrat : un client affiche son propre message, dans sa langue, d'après le code. Le `detail` s'adresse aux développeurs et peut évoluer librement.
+
+| Code | Statut | Situation |
+|---|---|---|
+| `VALIDATION_FAILED` | 400 | Champs invalides (détail par champ dans `errors`) |
+| `INVALID_CREDENTIALS` | 401 | Email ou mot de passe incorrect |
+| — | 403 | Accès réservé aux administrateurs |
+| `ROOM_NOT_FOUND`, `BOOKING_NOT_FOUND` | 404 | Ressource inexistante, ou réservation appartenant à un autre client |
+| `EMAIL_TAKEN`, `SLOT_TAKEN` | 409 | Email déjà utilisé, créneau déjà réservé |
+| `PLAYER_COUNT_OUT_OF_RANGE` | 422 | Nombre de joueurs hors limites (`min`, `max`) |
+| `SLOT_IN_PAST`, `BEYOND_BOOKING_WINDOW` | 422 | Créneau passé, ou trop lointain (`days`) |
+| `ROOM_CLOSED`, `NOT_A_SLOT` | 422 | Jour de fermeture, heure hors de la grille |
+| `ALREADY_CANCELLED`, `CANCELLATION_TOO_LATE` | 422 | Annulation impossible (`hours`) |
+
+### Contenu traduit
+`GET /api/rooms` et `GET /api/rooms/{id}` renvoient le thème et la description dans la langue demandée par l'en-tête `Accept-Language` : français (par défaut et en repli), anglais ou espagnol. Le nom des salles, nom propre, n'est pas traduit.
+
+Les traductions sont stockées dans une table dédiée, `room_translations` : ajouter une langue, c'est ajouter des lignes, pas modifier le schéma. Elles sont chargées avec la salle en une seule requête (`@EntityGraph`, pas de problème N+1). La réponse indique la langue servie (`Content-Language`) et prévient les caches qu'elle en dépend (`Vary: Accept-Language`).
 
 ### Sécurité
 - API **stateless** : aucune session côté serveur, chaque requête porte son jeton JWT.
 - L'identité du client est toujours lue dans le jeton, jamais dans le corps de la requête : impossible de réserver au nom de quelqu'un d'autre.
 - Un client qui tente d'accéder à la réservation d'un autre reçoit un `404` plutôt qu'un `403`, pour ne pas révéler son existence.
 - Mots de passe hachés avec BCrypt ; secrets fournis par variables d'environnement.
+- CORS limité aux origines déclarées (`CORS_ALLOWED_ORIGINS`).
 
 ---
 
@@ -149,10 +165,10 @@ src/main/java/.../
 ├── auth/          inscription, connexion, génération des JWT
 ├── availability/  calcul des créneaux disponibles
 ├── booking/       réservations, règles métier, planning des créneaux
-├── room/          salles
+├── room/          salles et leurs traductions
 ├── user/          comptes utilisateurs, création du compte admin
-├── config/        sécurité, propriétés, horloge, OpenAPI
-└── common/        exceptions et gestion globale des erreurs
+├── config/        sécurité, CORS, langues, propriétés, horloge, OpenAPI
+└── common/        exceptions, codes d'erreur et gestion globale des erreurs
 ```
 
 ### Modèle de données
@@ -161,6 +177,7 @@ src/main/java/.../
 erDiagram
     USERS ||--o{ BOOKINGS : "réserve"
     ROOMS ||--o{ BOOKINGS : "accueille"
+    ROOMS ||--o{ ROOM_TRANSLATIONS : "est traduite en"
 
     USERS {
         bigint id PK
@@ -173,12 +190,20 @@ erDiagram
     ROOMS {
         bigint id PK
         varchar name UK
+        varchar theme
+        text description
         smallint difficulty
         smallint min_players
         smallint max_players
         int session_minutes
         int reset_minutes
         numeric price_per_person
+    }
+    ROOM_TRANSLATIONS {
+        bigint room_id PK, FK
+        varchar locale PK
+        varchar theme
+        text description
     }
     BOOKINGS {
         bigint id PK
@@ -211,7 +236,7 @@ cd escape-game-booking
 
 Sous Windows : `.\mvnw.cmd spring-boot:run`
 
-La base PostgreSQL est démarrée automatiquement via Docker Compose, et Flyway crée le schéma ainsi que les 4 salles.
+La base PostgreSQL est démarrée automatiquement via Docker Compose, et Flyway crée le schéma, les 4 salles et leurs traductions.
 
 - API : http://localhost:8080
 - **Documentation interactive (Swagger UI) : http://localhost:8080/swagger-ui.html**
@@ -239,10 +264,13 @@ curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"alice@example.com","password":"motdepasse123"}'
 
-# 3. Consulter les créneaux d'une salle
+# 3. Consulter une salle en anglais
+curl http://localhost:8080/api/rooms/1 -H "Accept-Language: en"
+
+# 4. Consulter les créneaux d'une salle
 curl "http://localhost:8080/api/rooms/1/availability?date=2026-12-05"
 
-# 4. Réserver
+# 5. Réserver
 curl -X POST http://localhost:8080/api/bookings \
   -H "Authorization: Bearer <jeton>" \
   -H "Content-Type: application/json" \
@@ -255,8 +283,8 @@ curl -X POST http://localhost:8080/api/bookings \
 
 | Méthode | Route | Accès | Description |
 |---|---|---|---|
-| `GET` | `/api/rooms` | Public | Liste des salles |
-| `GET` | `/api/rooms/{id}` | Public | Détail d'une salle |
+| `GET` | `/api/rooms` | Public | Liste des salles (selon `Accept-Language`) |
+| `GET` | `/api/rooms/{id}` | Public | Détail d'une salle (selon `Accept-Language`) |
 | `GET` | `/api/rooms/{id}/availability?date=` | Public | Créneaux d'une journée |
 | `POST` | `/api/auth/register` | Public | Création de compte |
 | `POST` | `/api/auth/login` | Public | Connexion, renvoie un JWT |
@@ -266,7 +294,7 @@ curl -X POST http://localhost:8080/api/bookings \
 | `PATCH` | `/api/bookings/{id}/cancel` | Propriétaire ou admin | Annuler une réservation |
 | `GET` | `/api/admin/bookings?date=` | Admin | Planning du jour |
 
-Le détail complet (schémas, exemples, codes de retour) est disponible dans Swagger UI.
+Le détail complet (schémas, exemples, codes de retour, en-tête `Accept-Language`) est disponible dans Swagger UI.
 
 ---
 
@@ -280,8 +308,8 @@ Docker doit être lancé : les tests d'intégration démarrent leur propre Postg
 
 | Type | Ce qui est vérifié |
 |---|---|
-| **Unitaires** (JUnit, Mockito) | Règles métier des réservations, grille des créneaux, fenêtre de réservation, droits d'accès, avec une horloge figée |
-| **Intégration** (MockMvc, Testcontainers) | Application complète sur un vrai PostgreSQL : sécurité, parcours de réservation, contrainte d'exclusion, réservations simultanées |
+| **Unitaires** (JUnit, Mockito) | Règles métier des réservations, grille des créneaux, jours de fermeture, fenêtre de réservation, droits d'accès, codes d'erreur, avec une horloge figée |
+| **Intégration** (MockMvc, Testcontainers) | Application complète sur un vrai PostgreSQL : sécurité, CORS, parcours de réservation, contrainte d'exclusion, réservations simultanées, format des erreurs, traductions et en-têtes de langue |
 
 Les tests sont exécutés automatiquement par **GitHub Actions** à chaque push et à chaque pull request.
 
@@ -289,12 +317,10 @@ Les tests sont exécutés automatiquement par **GitHub Actions** à chaque push 
 
 ## 🔭 Pistes d'évolution
 
-- [ ] Interface web en React / TypeScript
-- [ ] Gestion des salles par l'administrateur (création, modification, désactivation)
-- [ ] Email de confirmation de réservation
-- [ ] Jetons de rafraîchissement (refresh tokens)
-- [ ] Paiement en ligne
-- [ ] Image Docker de l'application et déploiement
+- Envoi d'un email de confirmation et d'annulation.
+- Gestion des salles par l'administrateur (création, horaires, traductions).
+- Jeton de rafraîchissement pour prolonger les sessions sans reconnexion.
+- Limitation du nombre de tentatives de connexion.
 
 ---
 
@@ -302,4 +328,4 @@ Les tests sont exécutés automatiquement par **GitHub Actions** à chaque push 
 
 **Marie-Aude Torchy**, développeuse fullstack à Nantes
 
-[LinkedIn](www.linkedin.com/in/marie-aude-torchy-04300b123) · [GitHub](https://github.com/Maudilama)
+[LinkedIn](https://www.linkedin.com/in/marie-aude-torchy-04300b123) · [GitHub](https://github.com/Maudilama)
